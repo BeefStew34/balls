@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Mahitahi</title>
+  <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+  </head>
+  
+  <body style="background: black">
+    <div id="guh"></div> 
+  </body>
+  <script>
+  var scale = 3;
+  class network{
+    constructor(p1,p2){
+        this.group = [p1,p2];
+        this.dirX = (p1.dirX+p2.dirX)/2;
+        this.dirY = (p1.dirY+p2.dirY)/2;
+        this.speed = 3;
+    }
+    add(x){
+        this.group.push(x);
+        this.speed = 1;
+    }
+  }
+  class ball{
+      constructor(x,y,dirX,dirY){
+          this.x = x;
+          this.y = y;
+          this.dirX = dirX;
+          this.dirY = dirY;
+          this.network = null;
+          this.connections = [];
+          this.lines = []
+          var c = "#";
+          for(var i = 0; i < 3; i++)
+            c += Rand(50,200).toString(16);
+          //console.log(c);
+          this.shape = new Konva.Circle({
+              x:x,
+              y:y,
+              radius: 10/scale,
+              fill: c
+            });
+          }
+          addConnection(newB){
+            this.connections.push(newB);
+            this.shape.setAttr("radius",((Math.min(this.connections.length,4)*2)+10)/scale);
+            var l = new Konva.Line({
+                points: [this.x,this.y,newB.x,newB.y],
+                stroke: 'white',
+                strokeWidth: 2/scale,
+            });
+            lineLayer.add(l);
+            this.lines.push(l);
+            
+            var newColour = this.shape.getAttr("fill");
+            
+            var rgb1 = [parseInt(newColour[1]+newColour[2],16)
+            ,parseInt(newColour[3]+newColour[4],16)
+            ,parseInt(newColour[5]+newColour[6],16)];
+            var newColour = newB.shape.getAttr("fill");
+            
+            var rgb2 = [parseInt(newColour[1]+newColour[2],16)
+            ,parseInt(newColour[3]+newColour[4],16)
+            ,parseInt(newColour[5]+newColour[6],16)];
+            var newCol = "#";
+            for(var i = 0; i < 3; i++)
+                newCol += (Math.floor((rgb1[i]+rgb2[i])/2)).toString(16);
+            
+            this.shape.setAttr("fill", newCol);
+            newB.shape.setAttr("fill", newCol);
+            
+          }
+      }
+    
+    function Rand(x, y){
+      return Math.floor(Math.random()* y) + x;
+    }
+    function PosOrNeg(){
+      if(Math.random() > 0.5)
+        return -1;
+      return 1;
+    }
+
+    var wid = window.innerWidth;
+    var hei = window.innerHeight;
+
+    var stage = new Konva.Stage({
+      container: 'guh',
+      width:wid,
+      height: hei,
+    });
+
+
+    
+    var layer = new Konva.Layer();
+    var lineLayer = new Konva.Layer();
+    bList = [];
+    nList = [];
+    
+    for(var i = 0; i < 20*scale; i++){
+        bList.push(new ball(Rand(0,wid),Rand(0,hei),Math.random(),Math.random()));
+        layer.add(bList[i].shape);
+    }
+    
+    stage.add(lineLayer);
+    stage.add(layer);
+
+    var speed = 8;
+    var ballMax = 100*scale;
+    function RandomBallSpawn(){
+    
+        if(bList.length > ballMax)
+           return;
+         var side = Rand(0,4);
+         var spawnPos = [];
+         switch(side){
+            case 0:
+                spawnPos = [Rand(20,wid-20), 20];
+                break;
+            case 1:
+                spawnPos = [Rand(20,wid-20), hei-20];
+                break;
+            case 2:
+                spawnPos = [20, Rand(20,hei-10)];
+                break;
+            case 3:
+                spawnPos = [wid-20, Rand(20,hei-10)];
+                break
+         }
+        bList.forEach((elm) => {
+            if(Math.abs(spawnPos[0]-elm.x) < 30 && Math.abs(spawnPos[1]-elm.y) < 30)
+                return;
+        });
+        b = new ball(spawnPos[0],spawnPos[1],Math.random(),Math.random());
+        bList.push(b);
+        layer.add(b.shape);
+    }
+    
+    var counter = 0;
+    window.setInterval(() =>{
+        counter++;
+        if(bList.length == (ballMax*scale)+1 && nList.length > 3)
+            return;
+        if(counter > 10){
+            counter = 0;
+            RandomBallSpawn();
+        }
+            
+        for(var i = 0; i < bList.length; i++){
+            for(var p = 0; p < bList[i].lines.length; p++){
+                bList[i].lines[p].setAttr("points", [bList[i].x,bList[i].y,bList[i].connections[p].x,bList[i].connections[p].y]);
+            }
+            for(var j = i; j < bList.length; j++){
+                   if(i == j)
+                      continue;
+                      
+                   var dist = Math.sqrt(
+                    Math.pow(bList[i].x-bList[j].x,2)+
+                    Math.pow(bList[i].y-bList[j].y,2));
+                    var max = (bList[i].shape.getAttr("radius")+bList[j].shape.getAttr("radius"))*2.2;
+                    var min = (bList[i].shape.getAttr("radius")+bList[j].shape.getAttr("radius"));
+                    if(dist > max*(scale/2) || dist < (max/1.2)*(scale/2))
+                        continue;
+                    if(!bList[i].connections.includes(bList[j]))
+                        bList[i].addConnection(bList[j]);
+                    if(!bList[j].connections.includes(bList[i]))
+                         bList[j].addConnection(bList[i]);
+                    if(bList[i].network == bList[j].network && bList[i].network != null)
+                        continue;
+                    
+                    if(bList[i].network == null && bList[j].network != null){
+                        bList[i].network = bList[j].network;
+                        bList[i].network.add(bList[i]);
+                        //nList.splice(nList.indexOf(bList[j].network),1);
+                    }
+                    else if(bList[i].network != null && bList[j].network == null){
+                        bList[j].network = bList[i].network;
+                        bList[j].network.add(bList[j]);
+                        //nList.splice(nList.indexOf(bList[i].network),1);
+                    }
+                    else if(bList[i].network == null && bList[j].network == null){
+                        bList[j].network = new network(bList[j],bList[i]);
+                        bList[i].network = bList[j].network;
+                        nList.push(bList[j].network);
+                        
+                    }
+                    else{
+                        nList.splice(nList.indexOf(bList[j].network),1);
+                        searchSet(bList[j],bList[i].network);
+                        nList[nList.indexOf(bList[i].network)] = bList[i].network;
+                    }
+              }
+              
+              var b = bList[i]; 
+              
+              if(b.network != null)
+                continue;
+                
+              
+              b.shape.absolutePosition({x: b.x, y:b.y});
+              b.x += b.dirX*speed;
+              b.y += b.dirY*speed;
+              var xFac = ((b.dirX*b.shape.getAttr("radius"))+b.x);
+              var yFac = ((b.dirY*b.shape.getAttr("radius"))+b.y);
+              if(xFac > wid || xFac < 0)
+                b.dirX = -b.dirX;
+              else if(yFac > hei || yFac < 0)
+                  b.dirY = -b.dirY;
+                
+            }
+            for(var j = 0; j < nList.length; j++){
+                var n = nList[j];
+                for(var i = 0; i < n.group.length; i++)
+                    moveBall(n,i);
+            }
+        },50);
+        function searchSet(x,y){
+            for(var i = 0; i < x.connections.length; i++){
+                if(x.connections[i].network != y){
+                    x.connections[i].network = y;
+                    y.group.push(x.connections[i]);
+                    searchSet(x.connections[i],y);  
+                 }
+            }
+        }
+        function moveBall(n,i){
+            var k = n.group[i];
+            k.shape.absolutePosition({x: k.x, y:k.y});
+            k.x += n.dirX*n.speed;
+            k.y += n.dirY*n.speed;
+            var xFac = ((n.dirX*k.shape.getAttr("radius"))+k.x);
+            var yFac = ((n.dirY*k.shape.getAttr("radius"))+k.y);
+            if(xFac > wid || xFac < 0)
+              n.dirX = -n.dirX;
+            else if(yFac > hei || yFac < 0)
+              n.dirY = -n.dirY;
+        }
+
+  </script>
+</html>
